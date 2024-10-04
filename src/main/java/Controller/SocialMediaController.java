@@ -1,33 +1,143 @@
 package Controller;
 
+import Model.Account;
+import Model.Message;
+import Service.AccountService;
+import Service.MessageService;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 
-/**
- * TODO: You will need to write your own endpoints and handlers for your controller. The endpoints you will need can be
- * found in readme.md as well as the test cases. You should
- * refer to prior mini-project labs and lecture materials for guidance on how a controller may be built.
- */
 public class SocialMediaController {
-    /**
-     * In order for the test cases to work, you will need to write the endpoints in the startAPI() method, as the test
-     * suite must receive a Javalin object from this method.
-     * @return a Javalin app object which defines the behavior of the Javalin controller.
-     */
+
+    private AccountService accountService;
+    private MessageService messageService;
+
+    public SocialMediaController() {
+        // Initialize the services
+        accountService = new AccountService();
+        messageService = new MessageService();
+    }
+
     public Javalin startAPI() {
         Javalin app = Javalin.create();
-        app.get("example-endpoint", this::exampleHandler);
+
+        // Define the routes
+        app.post("/register", this::registerAccount);
+        app.post("/login", this::loginAccount);
+        app.post("/messages", this::createMessage);
+        app.get("/messages", this::getAllMessages);
+        app.get("/messages/{message_id}", this::getMessageById);
+        app.delete("/messages/{message_id}", this::deleteMessageById);
+        app.patch("/messages/{message_id}", this::updateMessageText);
+        app.get("/accounts/{account_id}/messages", this::getMessagesByAccount);
 
         return app;
     }
 
-    /**
-     * This is an example handler for an example endpoint.
-     * @param context The Javalin Context object manages information about both the HTTP request and response.
-     */
-    private void exampleHandler(Context context) {
-        context.json("sample text");
+    private void registerAccount(Context ctx) {
+        Account account = ctx.bodyAsClass(Account.class);
+        Account registeredAccount = accountService.registerAccount(account);
+        if (registeredAccount != null) {
+            ctx.json(registeredAccount);
+        } else {
+            ctx.status(400);
+        }
     }
 
+    private void loginAccount(Context ctx) {
+        Account account = ctx.bodyAsClass(Account.class);
+        Account loggedInAccount = accountService.login(account);
+        if (loggedInAccount != null) {
+            ctx.json(loggedInAccount);
+        } else {
+            ctx.status(401);
+        }
+    }
 
+    private void createMessage(Context ctx) {
+        Message message = ctx.bodyAsClass(Message.class);
+        Message createdMessage = messageService.createMessage(message);
+        if (createdMessage != null) {
+            ctx.json(createdMessage);
+        } else {
+            ctx.status(400);
+        }
+    }
+
+    private void getAllMessages(Context ctx) {
+        ctx.json(messageService.getAllMessages());
+    }
+
+    /*
+     private void getMessageById(Context ctx) {
+        int messageId = Integer.parseInt(ctx.pathParam("message_id"));
+        Message message = messageService.getMessageById(messageId);
+        if (message != null) {
+            ctx.json(message);
+        } else {
+            ctx.status(404); // Not found
+        }
+    }
+     */
+
+
+
+     private void getMessageById(Context ctx) {
+        int messageId = Integer.parseInt(ctx.pathParam("message_id"));
+        Message message = messageService.getMessageById(messageId);
+    
+        if (message != null) {
+            // If message exists, return it with a 200 OK status
+            ctx.json(message);
+            ctx.status(200);
+        } else {
+            // If the message doesn't exist, return 200 OK with an empty body
+            ctx.status(200);  // Ensure 200 OK
+            ctx.result("");   // Return an empty response body
+        }
+    }
+    
+    
+
+    private void deleteMessageById(Context ctx) {
+        int messageId = Integer.parseInt(ctx.pathParam("message_id"));
+        Message message = messageService.getMessageById(messageId); // Try to retrieve the message
+    
+        if (message != null) {
+            boolean success = messageService.deleteMessageById(messageId);
+            if (success) {
+                ctx.json(message);  // Return the deleted message as JSON
+            } else {
+                // If deletion fails for any reason, still return 200 but with an empty body
+                ctx.status(200);    // Status 200 OK, even if the message was not deleted successfully
+            }
+        } else {
+            // Return status 200 OK with an empty body if message not found (to match test expectations)
+            ctx.status(200);
+        }
+    }
+    
+    
+
+    private void updateMessageText(Context ctx) {
+        int messageId = Integer.parseInt(ctx.pathParam("message_id"));
+        String newText = ctx.bodyAsClass(Message.class).getMessage_text();
+        boolean success = messageService.updateMessage(messageId, newText);
+        if (success) {
+
+            // Return the updated message or a success message
+            Message updatedMessage = messageService.getMessageById(messageId);
+
+            ctx.json(updatedMessage);
+            ctx.status(200); // Successfully updated
+
+        } else {
+            ctx.status(400); // Bad request (invalid input)
+        }
+    }
+
+    private void getMessagesByAccount(Context ctx) {
+        int accountId = Integer.parseInt(ctx.pathParam("account_id"));
+        ctx.json(messageService.getMessagesByUser(accountId));
+    }
 }
